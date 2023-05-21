@@ -1,6 +1,7 @@
 package internals
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -22,6 +23,8 @@ func (server *Server) upload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+
+	_, _ = fmt.Fprintf(w, "Uploaded succesfully !")
 
 }
 

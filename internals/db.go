@@ -55,10 +55,6 @@ func (dbConn *DBConn) Setup() {
 }
 
 func (dbConn *DBConn) publishBlog(w http.ResponseWriter, blog Blog) error {
-
-	if 2 == 4 {
-		http.Error(w, "failed to create record in database", http.StatusInternalServerError)
-	}
-
+	// todo: write an insert query
 	return nil
 }
