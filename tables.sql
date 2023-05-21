@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS blogs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     author INT,
     content TEXT,
+    title VARCHAR(655)
     image JSON,
     FOREIGN KEY (author) REFERENCES authors(id),
     FULLTEXT (content)

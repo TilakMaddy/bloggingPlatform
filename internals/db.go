@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type Author struct {
@@ -56,5 +57,31 @@ func (dbConn *DBConn) Setup() {
 
 func (dbConn *DBConn) publishBlog(w http.ResponseWriter, blog Blog) error {
 	// todo: write an insert query
+	_, err := dbConn.DB.Exec(
+		"INSERT INTO blogs (author, content, image, title) VALUES (?, ?, ?, ?)",
+		blog.AuthorID,
+		blog.Content,
+		formatBlogImages(blog.Images),
+		blog.Title,
+	)
+
+	if err != nil {
+		http.Error(w, "failed to publish to db", http.StatusInternalServerError)
+		return err
+	}
+
 	return nil
+}
+
+func formatBlogImages(images []string) string {
+	var stringBuilder strings.Builder
+	stringBuilder.WriteString("[")
+	for i, image := range images {
+		if i != 0 {
+			stringBuilder.WriteString(",")
+		}
+		stringBuilder.WriteString("\"" + image + "\"")
+	}
+	stringBuilder.WriteString("]")
+	return stringBuilder.String()
 }
