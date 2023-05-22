@@ -2,6 +2,7 @@ package internals
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"log"
 	"os"
@@ -53,6 +54,36 @@ func (dbConn *DBConn) Setup() {
 
 }
 
+// Single SELECT query to blogs table
+func (dbConn *DBConn) numberOfBlogs(authorID int64) (int64, error) {
+	//goland:noinspection ALL
+	rows := dbConn.DB.QueryRow("SELECT COUNT(*) as count FROM blogs WHERE author = ?", authorID)
+
+	var count int64
+
+	if err := rows.Scan(&count); err != nil {
+		if err == sql.ErrNoRows {
+			// ignore throwing an error case where authorID doesn't exist in authors because
+			// it would become a loophole to exploit. Example:
+			//
+			// for id in  0...100:
+			//		if FIND-NUMBER-OF-BLOGS(id) throws an error:
+			// 			continue
+			//		else:
+			//			< id is valid >
+			//
+			// therefore, by returning 0 you put the user in an ambiguous state where
+			// he/she wouldn't know if a particular authorID actually exists
+			//
+			return 0, nil
+		}
+		return -1, fmt.Errorf("failed to query database")
+	}
+
+	return count, nil
+}
+
+// Single INSERT query to blogs table
 func (dbConn *DBConn) publishBlog(blog Blog) error {
 	//goland:noinspection ALL
 	var _, err = dbConn.DB.Exec(

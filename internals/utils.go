@@ -58,7 +58,7 @@ func convertReqFormToBlog(r *http.Request) (Blog, UtilError) {
 	}
 
 	imagesRaw := form.File["images"]
-	if images, err = downloadImages(imagesRaw); err != nil {
+	if images, err = downloadImages(imagesRaw, strconv.FormatInt(authorId, 10)); err != nil {
 		return Blog{}, UtilError{"images could not be processed", http.StatusInternalServerError}
 	}
 
@@ -74,7 +74,7 @@ func convertReqFormToBlog(r *http.Request) (Blog, UtilError) {
 }
 
 // Make a permanent location for the images that have been uploaded
-func downloadImages(imagesRaw []*multipart.FileHeader) ([]string, error) {
+func downloadImages(imagesRaw []*multipart.FileHeader, subFolderName string) ([]string, error) {
 
 	var downloadedImages []string
 
@@ -94,7 +94,7 @@ func downloadImages(imagesRaw []*multipart.FileHeader) ([]string, error) {
 		}
 
 		randFileName := randomFileName(suffix)
-		err = createFileAndCopy(randFileName, file)
+		err = createFileAndCopy(randFileName, file, subFolderName)
 		if err != nil {
 			return nil, err
 		}
@@ -122,8 +122,18 @@ func randomFileName(suffix string) string {
 }
 
 // Decides the location of upload in the local file system
-func createFileAndCopy(destFile string, orgFile multipart.File) error {
-	file, err := os.Create(filepath.Join(os.Getenv("UPLOAD_DIR"), destFile))
+func createFileAndCopy(destFile string, orgFile multipart.File, subFolderName string) error {
+
+	dirPath := filepath.Join(os.Getenv("UPLOAD_DIR"), subFolderName)
+
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		err := os.Mkdir(dirPath, 0777)
+		if err != nil {
+			return err
+		}
+	}
+
+	file, err := os.Create(filepath.Join(dirPath, destFile))
 	if err != nil {
 		return err
 	}
