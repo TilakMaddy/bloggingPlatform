@@ -1,6 +1,7 @@
 package internals
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,12 +15,23 @@ type Server struct {
 
 func (server *Server) search(w http.ResponseWriter, r *http.Request) {
 	searchTerm := r.FormValue("q")
-	blogs, err := server.db.searchBlogs(searchTerm)
+
+	blogs, searchErr := server.db.searchBlogs(searchTerm)
+	if searchErr != nil {
+		http.Error(w, searchErr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	blogBytes, err := json.Marshal(blogs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	_, _ = fmt.Fprintf(w, "Got'em ! \n%#v\n", blogs)
+
+	// It is important to set the header before you WriteHeader
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(blogBytes)
 }
 
 func (server *Server) upload(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +76,9 @@ func (server *Server) blogCount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _ = fmt.Fprintf(w, "%d", blogCount)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintf(w, "%d", []byte(strconv.FormatInt(blogCount, 10)))
 
 }
 
@@ -72,12 +86,16 @@ func (server *Server) Start(db *DBConn) {
 	server.db = db
 
 	// todo: getBlogsByAuthor, deleteBlogByID (with auth)
-	http.HandleFunc("/search", server.search)
-	http.HandleFunc("/upload", server.upload)
-	http.HandleFunc("/blog-count", server.blogCount)
+	http.HandleFunc("/api/search", server.search)        // ?q=search_term
+	http.HandleFunc("/api/blog-count", server.blogCount) // ?authorID=2
+	http.HandleFunc("/api/upload", server.upload)
+
+	http.Handle("/images/",
+		http.StripPrefix(
+			"/images/",
+			http.FileServer(http.Dir(os.Getenv("UPLOAD_DIR")))))
 
 	http.Handle("/", http.FileServer(http.Dir("html")))
-	http.Handle("/assets", http.FileServer(http.Dir(os.Getenv("UPLOAD_DIR"))))
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
