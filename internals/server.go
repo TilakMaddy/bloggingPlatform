@@ -13,6 +13,56 @@ type Server struct {
 	db *DBConn
 }
 
+func (server *Server) deleteBlogById(w http.ResponseWriter, r *http.Request) {
+	blogId, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	deleteErr := server.db.deleteBlogByID(blogId)
+	if deleteErr != nil {
+		http.Error(w, deleteErr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	// anything written to w, will henceforth be ignored by clients
+	// because http.StatusNoContent says 'I have nothing to give you'
+}
+
+func (server *Server) getBlogsByAuthor(w http.ResponseWriter, r *http.Request) {
+	authorID, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	blogs, searchErr := server.db.getBlogsByAuthor(authorID)
+	if searchErr != nil {
+		http.Error(w, searchErr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	blogBytes, err := json.Marshal(blogs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// It is important to set the header before you WriteHeader
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if len(blogs) == 0 {
+		_, _ = w.Write([]byte("0"))
+	} else {
+		_, _ = w.Write(blogBytes)
+	}
+
+}
+
 func (server *Server) search(w http.ResponseWriter, r *http.Request) {
 	searchTerm := r.FormValue("q")
 
@@ -76,18 +126,25 @@ func (server *Server) blogCount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	blogCountBytes, err := json.Marshal(blogCount)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "%d", []byte(strconv.FormatInt(blogCount, 10)))
+	_, _ = w.Write(blogCountBytes)
 
 }
 
 func (server *Server) Start(db *DBConn) {
 	server.db = db
 
-	// todo: getBlogsByAuthor, deleteBlogByID (with auth)
-	http.HandleFunc("/api/search", server.search)        // ?q=search_term
-	http.HandleFunc("/api/blog-count", server.blogCount) // ?authorID=2
+	http.HandleFunc("/api/delete-blog", server.deleteBlogById) // ?id=3
+	http.HandleFunc("/api/author", server.getBlogsByAuthor)    // ?id=3
+	http.HandleFunc("/api/search", server.search)              // ?q=search_term
+	http.HandleFunc("/api/blog-count", server.blogCount)       // ?authorID=2
 	http.HandleFunc("/api/upload", server.upload)
 
 	http.Handle("/images/",

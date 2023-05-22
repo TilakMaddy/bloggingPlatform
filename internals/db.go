@@ -63,7 +63,8 @@ func (dbConn *DBConn) deleteBlogByID(blogId int64) error {
 		deleteBlogAssets(&blog)
 	}
 
-	_, err := dbConn.DB.Exec("DELETE FROM BLOG WHERE id = ?", blogId)
+	//goland:noinspection ALL
+	_, err := dbConn.DB.Exec("DELETE FROM blogs WHERE id = ?", blogId)
 	if err != nil {
 		return err
 	}
@@ -72,6 +73,7 @@ func (dbConn *DBConn) deleteBlogByID(blogId int64) error {
 
 // Single SELECT query to blogs table with WHERE clause
 func (dbConn *DBConn) getBlogsByAuthor(authorID int64) ([]Blog, error) {
+	//goland:noinspection ALL
 	rows, err := dbConn.DB.Query(
 		"SELECT * FROM blogs WHERE author = ?", authorID)
 	if err != nil {
@@ -82,6 +84,7 @@ func (dbConn *DBConn) getBlogsByAuthor(authorID int64) ([]Blog, error) {
 
 // Single SELECT query to blogs table with LIKE clause
 func (dbConn *DBConn) searchBlogs(substring string) ([]Blog, error) {
+	//goland:noinspection ALL
 	rows, err := dbConn.DB.Query(
 		"SELECT * FROM blogs WHERE content LIKE CONCAT('%', ?, '%')", substring)
 	if err != nil {
