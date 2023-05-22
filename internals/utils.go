@@ -12,12 +12,20 @@ import (
 	"strings"
 )
 
-func convertToBlog(w http.ResponseWriter, r *http.Request) (Blog, error) {
+type UtilError struct {
+	message    string
+	statusCode int // should be 0 to indicate no error
+}
+
+func (e *UtilError) IsError() bool {
+	return e.statusCode != 0
+}
+
+func convertReqFormToBlog(r *http.Request) (Blog, UtilError) {
 
 	// to populate r.MultipartForm
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(w, "parse failed", http.StatusInternalServerError)
-		return Blog{}, err
+		return Blog{}, UtilError{"parse failed", http.StatusInternalServerError}
 	}
 
 	form := r.MultipartForm
@@ -35,23 +43,23 @@ func convertToBlog(w http.ResponseWriter, r *http.Request) (Blog, error) {
 
 	var err error
 
-	// todo: should not be empty
 	title = form.Value["title"][0]
-
-	// todo: must be a positive integer
-	if authorId, err = strconv.ParseInt(form.Value["author_id"][0], 10, 64); err != nil {
-		http.Error(w, "authorId is not a valid number", http.StatusBadRequest)
-		return Blog{}, err
+	if len(strings.TrimSpace(title)) == 0 {
+		return Blog{}, UtilError{"title is empty", http.StatusBadRequest}
 	}
 
-	// todo: shouldn't be empty
+	if authorId, err = strconv.ParseInt(form.Value["author_id"][0], 10, 64); err != nil || authorId <= 0 {
+		return Blog{}, UtilError{"authorId is not a valid number", http.StatusBadRequest}
+	}
+
 	content = form.Value["content"][0]
+	if len(strings.TrimSpace(content)) == 0 {
+		return Blog{}, UtilError{"content is empty", http.StatusBadRequest}
+	}
 
 	imagesRaw := form.File["images"]
-
 	if images, err = downloadImages(imagesRaw); err != nil {
-		http.Error(w, "images could not be processed", http.StatusInternalServerError)
-		return Blog{}, err
+		return Blog{}, UtilError{"images could not be processed", http.StatusInternalServerError}
 	}
 
 	// ready to be published by delegating to publishBlog(...)
@@ -62,7 +70,7 @@ func convertToBlog(w http.ResponseWriter, r *http.Request) (Blog, error) {
 		AuthorID: authorId,
 	}
 
-	return blog, nil
+	return blog, UtilError{} // by default statusCode = 0, so it will be no error
 }
 
 // Make a permanent location for the images that have been uploaded
