@@ -1,0 +1,5 @@
+export DB_USER=
+export DB_PASS=
+export DB_HOST=containers-us-west-XX.railway.app:5771
+export DB_NAME=railway
+export UPLOAD_DIR=uploads
