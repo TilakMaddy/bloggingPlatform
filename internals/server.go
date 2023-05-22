@@ -12,15 +12,16 @@ type Server struct {
 
 func (server *Server) upload(w http.ResponseWriter, r *http.Request) {
 
-	// convert uploaded data to Blog struct
+	// convert uploaded data to Blog struct and send relevant error as response
 	blog, err := convertToBlog(w, r)
 	if err != nil {
 		return
 	}
 
 	// publish the blog by writing it to the database
-	err = server.db.publishBlog(w, blog)
+	err = server.db.publishBlog(blog)
 	if err != nil {
+		http.Error(w, "failed to publish to db", http.StatusInternalServerError)
 		return
 	}
 

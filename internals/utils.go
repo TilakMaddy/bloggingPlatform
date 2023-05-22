@@ -22,6 +22,7 @@ func convertToBlog(w http.ResponseWriter, r *http.Request) (Blog, error) {
 
 	form := r.MultipartForm
 
+	//goland:noinspection ALL
 	defer form.RemoveAll()
 
 	// populate the below fields from multipart-form data
@@ -53,6 +54,7 @@ func convertToBlog(w http.ResponseWriter, r *http.Request) (Blog, error) {
 		return Blog{}, err
 	}
 
+	// ready to be published by delegating to publishBlog(...)
 	blog := Blog{
 		Title:    title,
 		Content:  content,
@@ -75,6 +77,7 @@ func downloadImages(imagesRaw []*multipart.FileHeader) ([]string, error) {
 			return nil, err
 		}
 
+		//goland:noinspection ALL
 		defer file.Close()
 
 		suffix, err := extractSuffix(imageHeader.Filename)
@@ -112,10 +115,24 @@ func randomFileName(suffix string) string {
 
 // Decides the location of upload in the local file system
 func createFileAndCopy(destFile string, orgFile multipart.File) error {
-	file, err := os.Create(filepath.Join("uploads", destFile))
+	file, err := os.Create(filepath.Join(os.Getenv("UPLOAD_DIR"), destFile))
 	if err != nil {
 		return err
 	}
 	_, err = io.Copy(file, orgFile)
 	return err
+}
+
+// Convert array to string representation that can be safely inserted to MySQL
+func stringifyToMySQLJSONArray(images []string) string {
+	var stringBuilder strings.Builder
+	stringBuilder.WriteString("[")
+	for i, image := range images {
+		if i != 0 {
+			stringBuilder.WriteString(",")
+		}
+		stringBuilder.WriteString("\"" + image + "\"")
+	}
+	stringBuilder.WriteString("]")
+	return stringBuilder.String()
 }
