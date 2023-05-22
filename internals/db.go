@@ -2,6 +2,7 @@ package internals
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"log"
@@ -54,7 +55,42 @@ func (dbConn *DBConn) Setup() {
 
 }
 
-// Single SELECT query to blogs table
+// Two queries - SELECT, DELETE both happen individually
+func (dbConn *DBConn) deleteBlogByID(blogId int64) error {
+
+	blog, fetchErr := dbConn.fetchBlogByID(blogId)
+	if fetchErr == nil {
+		deleteBlogAssets(&blog)
+	}
+
+	_, err := dbConn.DB.Exec("DELETE FROM BLOG WHERE id = ?", blogId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Single SELECT query to blogs table with WHERE clause
+func (dbConn *DBConn) getBlogsByAuthor(authorID int64) ([]Blog, error) {
+	rows, err := dbConn.DB.Query(
+		"SELECT * FROM blogs WHERE author = ?", authorID)
+	if err != nil {
+		return nil, err
+	}
+	return convertMySQLRowsToBlogs(rows)
+}
+
+// Single SELECT query to blogs table with LIKE clause
+func (dbConn *DBConn) searchBlogs(substring string) ([]Blog, error) {
+	rows, err := dbConn.DB.Query(
+		"SELECT * FROM blogs WHERE content LIKE CONCAT('%', ?, '%')", substring)
+	if err != nil {
+		return nil, err
+	}
+	return convertMySQLRowsToBlogs(rows)
+}
+
+// Single SELECT query to blogs table with COUNT aggregation
 func (dbConn *DBConn) numberOfBlogs(authorID int64) (int64, error) {
 	//goland:noinspection ALL
 	rows := dbConn.DB.QueryRow("SELECT COUNT(*) as count FROM blogs WHERE author = ?", authorID)
@@ -81,6 +117,29 @@ func (dbConn *DBConn) numberOfBlogs(authorID int64) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// Single SELECT query to fetch a blog by its ID
+func (dbConn *DBConn) fetchBlogByID(blogId int64) (Blog, error) {
+
+	//goland:noinspection ALL
+	row := dbConn.DB.QueryRow("SELECT * FROM blogs WHERE id = ?", blogId)
+
+	var (
+		blog   Blog
+		images string // will be eventually unmarshalled to images:[]string inside blob
+	)
+
+	if err := row.Scan(&blog.ID, &blog.AuthorID, &blog.Content, &images, &blog.Title); err != nil {
+		return Blog{}, err
+	}
+
+	// populate blog by exploding the images string
+	if err := json.Unmarshal([]byte(images), &blog.Images); err != nil {
+		return Blog{}, err
+	}
+
+	return blog, nil
 }
 
 // Single INSERT query to blogs table

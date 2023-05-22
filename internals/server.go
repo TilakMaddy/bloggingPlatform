@@ -4,11 +4,22 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 )
 
 type Server struct {
 	db *DBConn
+}
+
+func (server *Server) search(w http.ResponseWriter, r *http.Request) {
+	searchTerm := r.FormValue("q")
+	blogs, err := server.db.searchBlogs(searchTerm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, _ = fmt.Fprintf(w, "Got'em ! \n%#v\n", blogs)
 }
 
 func (server *Server) upload(w http.ResponseWriter, r *http.Request) {
@@ -27,6 +38,7 @@ func (server *Server) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusCreated)
 	_, _ = fmt.Fprintf(w, "Uploaded succesfully !")
 
 }
@@ -58,8 +70,14 @@ func (server *Server) blogCount(w http.ResponseWriter, r *http.Request) {
 
 func (server *Server) Start(db *DBConn) {
 	server.db = db
+
+	// todo: getBlogsByAuthor, deleteBlogByID (with auth)
+	http.HandleFunc("/search", server.search)
 	http.HandleFunc("/upload", server.upload)
 	http.HandleFunc("/blog-count", server.blogCount)
+
 	http.Handle("/", http.FileServer(http.Dir("html")))
+	http.Handle("/assets", http.FileServer(http.Dir(os.Getenv("UPLOAD_DIR"))))
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

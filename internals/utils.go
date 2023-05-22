@@ -1,6 +1,8 @@
 package internals
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"io"
@@ -153,4 +155,41 @@ func stringifyToMySQLJSONArray(images []string) string {
 	}
 	stringBuilder.WriteString("]")
 	return stringBuilder.String()
+}
+
+// Delete the blog's images sitting on the server
+func deleteBlogAssets(blog *Blog) {
+	var subFolder = strconv.FormatInt(blog.AuthorID, 10)
+	var images = blog.Images
+	for _, image := range images {
+		file := filepath.Join(os.Getenv("UPLOAD_DIR"), subFolder, image)
+		_ = os.Remove(file)
+	}
+}
+
+// Convert rows to blogs
+func convertMySQLRowsToBlogs(rows *sql.Rows) ([]Blog, error) {
+	//goland:noinspection ALL
+	defer rows.Close()
+
+	var blogs []Blog
+
+	for rows.Next() {
+		var blog Blog
+		var images string
+		if err := rows.Scan(&blog.ID, &blog.AuthorID, &blog.Content, &images, &blog.Title); err != nil {
+			return nil, err
+		}
+		// populate blog by exploding the images string
+		if err := json.Unmarshal([]byte(images), &blog.Images); err != nil {
+			return nil, err
+		}
+		blogs = append(blogs, blog)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return blogs, nil
 }
